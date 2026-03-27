@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
-from datetime import date, timedelta, time
+from datetime import date, timedelta, time, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -16,6 +16,9 @@ from core.database import (
     actualizar_trade,
     load_pares,
     get_lista_pares_plana,
+    obtener_imagenes_trade,
+    insertar_imagen_trade,
+    eliminar_imagen_trade,
 )
 
 st.set_page_config(page_title="Historial — Trading Journal Pro", layout="wide")
@@ -236,6 +239,18 @@ else:
 
             nuevas_notas = st.text_area("Notas", value=trade_sel.get("notas", "") or "")
 
+            nuevo_asr = st.text_area(
+                "📝 Análisis ASR (After Session Review)",
+                value=trade_sel.get("analisis_asr", "") or "",
+                height=200,
+                placeholder=(
+                    "• ¿Qué salió bien / mal?\n"
+                    "• ¿Se respetó el plan?\n"
+                    "• Lecciones aprendidas\n"
+                    "• Contexto macro / sesión"
+                ),
+            )
+
             guardar_edicion = st.form_submit_button("💾 Guardar cambios", use_container_width=True, type="primary")
 
         if guardar_edicion:
@@ -247,9 +262,67 @@ else:
             datos_actualizados["pips_resultado"] = nuevos_pips
             datos_actualizados["porcentaje_cuenta"] = nuevo_pct
             datos_actualizados["notas"] = nuevas_notas
+            datos_actualizados["analisis_asr"] = nuevo_asr if nuevo_asr else None
+            # Asegurar que analisis_asr existe aunque no estuviera en el trade antiguo
+            if "analisis_asr" not in datos_actualizados:
+                datos_actualizados["analisis_asr"] = None
 
             if actualizar_trade(trade_id_seleccionado, datos_actualizados):
                 st.success(f"Trade #{trade_id_seleccionado} actualizado correctamente.")
                 st.rerun()
             else:
                 st.error("Error actualizando el trade.")
+
+    # ─── Imágenes del trade seleccionado ──────────────────────────────────────
+    st.markdown("---")
+    st.markdown(f"#### 🖼️ Imágenes del Trade #{trade_id_seleccionado}")
+
+    imagenes = obtener_imagenes_trade(trade_id_seleccionado)
+
+    # Mostrar imagen legada (screenshot_path antiguo) si existe
+    legacy_path = trade_sel.get("screenshot_path")
+    if legacy_path and os.path.isfile(legacy_path):
+        st.caption("Screenshot original")
+        st.image(legacy_path, use_container_width=True)
+
+    if imagenes:
+        cols_img = st.columns(min(len(imagenes), 3))
+        for i, img in enumerate(imagenes):
+            path = img.get("imagen_path", "")
+            if os.path.isfile(path):
+                with cols_img[i % 3]:
+                    st.image(path, use_container_width=True)
+                    if st.button(f"🗑️ Eliminar imagen #{img['id']}", key=f"del_img_{img['id']}"):
+                        eliminar_imagen_trade(img["id"])
+                        st.rerun()
+    elif not legacy_path:
+        st.caption("No hay imágenes adjuntas para este trade.")
+
+    # Subir nuevas imágenes
+    with st.expander("➕ Añadir imágenes al trade"):
+        nuevas_imgs = st.file_uploader(
+            "Selecciona una o varias imágenes",
+            type=["png", "jpg", "jpeg", "webp", "gif"],
+            accept_multiple_files=True,
+            key=f"upload_imgs_{trade_id_seleccionado}",
+        )
+        if st.button("📎 Adjuntar imágenes seleccionadas", key=f"adjuntar_{trade_id_seleccionado}"):
+            if nuevas_imgs:
+                screenshots_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "data", "screenshots",
+                )
+                os.makedirs(screenshots_dir, exist_ok=True)
+                orden_base = len(imagenes)
+                for i, img_file in enumerate(nuevas_imgs):
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%f")
+                    ext = img_file.name.rsplit(".", 1)[-1]
+                    nombre = f"trade{trade_id_seleccionado}_{timestamp}_{i}.{ext}"
+                    ruta = os.path.join(screenshots_dir, nombre)
+                    with open(ruta, "wb") as f:
+                        f.write(img_file.getbuffer())
+                    insertar_imagen_trade(trade_id_seleccionado, ruta, orden_base + i)
+                st.success(f"{len(nuevas_imgs)} imagen(es) añadida(s).")
+                st.rerun()
+            else:
+                st.warning("Selecciona al menos una imagen primero.")

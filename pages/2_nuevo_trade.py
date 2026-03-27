@@ -9,7 +9,7 @@ from datetime import date, time, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.database import insertar_trade, load_pares, obtener_configuracion
+from core.database import insertar_trade, insertar_imagen_trade, load_pares, obtener_configuracion
 from core.risk_engine import calcular_rr
 
 st.set_page_config(page_title="Nuevo Trade — Trading Journal Pro", layout="wide")
@@ -233,11 +233,28 @@ with st.form("form_nuevo_trade", clear_on_submit=False):
                 placeholder="Escribe aquí tus observaciones sobre el trade...",
                 height=120,
             )
-            screenshot = st.file_uploader(
-                "Screenshot (opcional)",
-                type=["png", "jpg", "jpeg", "webp"],
-                help="Sube una imagen del gráfico en el momento del trade",
-            )
+
+    # ─── Sección: Análisis ASR ────────────────────────────────────────────────
+    with st.expander("📝 Análisis ASR (After Session Review)", expanded=False):
+        analisis_asr = st.text_area(
+            "Análisis post-operación",
+            placeholder=(
+                "Escribe aquí tu análisis detallado del trade:\n"
+                "• ¿Qué salió bien / mal?\n"
+                "• ¿Se respetó el plan?\n"
+                "• Lecciones aprendidas\n"
+                "• Contexto macro / sesión\n"
+                "• Emociones y disciplina"
+            ),
+            height=220,
+            help="Este campo queda guardado junto al trade para revisión posterior.",
+        )
+        screenshots = st.file_uploader(
+            "Imágenes del trade (opcional — múltiples permitidas)",
+            type=["png", "jpg", "jpeg", "webp", "gif"],
+            accept_multiple_files=True,
+            help="Sube los gráficos, capturas de entrada/salida, etc.",
+        )
 
     # ─── Botón de guardar ─────────────────────────────────────────────────────
     st.markdown("---")
@@ -274,22 +291,6 @@ if submit:
         for error in errores:
             st.error(f"❌ {error}")
     else:
-        # Guardar screenshot si se subió
-        screenshot_path = None
-        if screenshot is not None:
-            screenshots_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "data", "screenshots"
-            )
-            os.makedirs(screenshots_dir, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            ext = screenshot.name.split(".")[-1]
-            nombre_archivo = f"{timestamp}_{par_seleccionado}.{ext}"
-            ruta_completa = os.path.join(screenshots_dir, nombre_archivo)
-            with open(ruta_completa, "wb") as f:
-                f.write(screenshot.getbuffer())
-            screenshot_path = ruta_completa
-
         # Preparar datos
         datos_trade = {
             "fecha_entrada": fecha_entrada.isoformat(),
@@ -319,12 +320,33 @@ if submit:
             "condicion_mercado": condicion_mercado,
             "rr_conseguido": max(0, rr_conseguido),
             "notas": notas if notas else None,
-            "screenshot_path": screenshot_path,
+            "screenshot_path": None,
+            "analisis_asr": analisis_asr if analisis_asr else None,
         }
 
         try:
             nuevo_id = insertar_trade(datos_trade)
-            st.success(f"✅ Trade #{nuevo_id} guardado correctamente — {par_seleccionado} {direccion} {resultado}")
+
+            # Guardar imágenes adjuntas
+            if screenshots:
+                screenshots_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "data", "screenshots",
+                )
+                os.makedirs(screenshots_dir, exist_ok=True)
+                for orden, img_file in enumerate(screenshots):
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%f")
+                    ext = img_file.name.rsplit(".", 1)[-1]
+                    nombre_archivo = f"trade{nuevo_id}_{timestamp}_{orden}.{ext}"
+                    ruta = os.path.join(screenshots_dir, nombre_archivo)
+                    with open(ruta, "wb") as f:
+                        f.write(img_file.getbuffer())
+                    insertar_imagen_trade(nuevo_id, ruta, orden)
+
+            st.success(
+                f"✅ Trade #{nuevo_id} guardado — {par_seleccionado} {direccion} {resultado}"
+                + (f" · {len(screenshots)} imagen(es) adjunta(s)" if screenshots else "")
+            )
             st.balloons()
         except Exception as e:
             st.error(f"Error guardando el trade: {e}")

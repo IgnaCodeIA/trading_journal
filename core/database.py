@@ -60,7 +60,25 @@ def inicializar_db():
                 condicion_mercado TEXT,
                 rr_conseguido REAL,
                 notas TEXT,
-                screenshot_path TEXT
+                screenshot_path TEXT,
+                analisis_asr TEXT
+            )
+        """)
+
+        # Migración: añadir analisis_asr si la tabla ya existía sin esa columna
+        try:
+            cursor.execute("ALTER TABLE trades ADD COLUMN analisis_asr TEXT")
+        except Exception:
+            pass  # La columna ya existe
+
+        # Tabla de imágenes adjuntas por trade (múltiples por operación)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trade_imagenes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id INTEGER NOT NULL,
+                imagen_path TEXT NOT NULL,
+                orden INTEGER DEFAULT 0,
+                FOREIGN KEY (trade_id) REFERENCES trades(id) ON DELETE CASCADE
             )
         """)
 
@@ -121,7 +139,8 @@ def insertar_trade(datos: dict) -> int:
                 trailing_stop, trailing_base, sl_breakeven,
                 cierre_parcial, porcentaje_cierre_parcial,
                 resultado, pips_resultado, porcentaje_cuenta, importe_dinero,
-                sesion, condicion_mercado, rr_conseguido, notas, screenshot_path
+                sesion, condicion_mercado, rr_conseguido, notas, screenshot_path,
+                analisis_asr
             ) VALUES (
                 :fecha_entrada, :hora_entrada, :fecha_salida, :hora_salida,
                 :par, :direccion, :estrategia, :tipo_operacion, :timeframe_entrada,
@@ -129,7 +148,8 @@ def insertar_trade(datos: dict) -> int:
                 :trailing_stop, :trailing_base, :sl_breakeven,
                 :cierre_parcial, :porcentaje_cierre_parcial,
                 :resultado, :pips_resultado, :porcentaje_cuenta, :importe_dinero,
-                :sesion, :condicion_mercado, :rr_conseguido, :notas, :screenshot_path
+                :sesion, :condicion_mercado, :rr_conseguido, :notas, :screenshot_path,
+                :analisis_asr
             )
         """, datos)
         nuevo_id = cursor.lastrowid
@@ -204,7 +224,8 @@ def actualizar_trade(trade_id: int, datos: dict) -> bool:
                 condicion_mercado = :condicion_mercado,
                 rr_conseguido = :rr_conseguido,
                 notas = :notas,
-                screenshot_path = :screenshot_path
+                screenshot_path = :screenshot_path,
+                analisis_asr = :analisis_asr
             WHERE id = :id
         """, datos)
         conn.commit()
@@ -411,6 +432,89 @@ def get_lista_pares_plana() -> list:
         for par in pares:
             lista.append(par)
     return lista
+
+
+# ─── IMÁGENES POR TRADE ───────────────────────────────────────────────────────
+
+def insertar_imagen_trade(trade_id: int, imagen_path: str, orden: int = 0) -> int:
+    """Asocia una imagen a un trade. Devuelve el ID de la fila creada."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO trade_imagenes (trade_id, imagen_path, orden) VALUES (?, ?, ?)",
+            (trade_id, imagen_path, orden),
+        )
+        nuevo_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return nuevo_id
+    except Exception as e:
+        print(f"Error insertando imagen para trade {trade_id}: {e}")
+        raise
+
+
+def obtener_imagenes_trade(trade_id: int) -> list:
+    """Devuelve la lista de imágenes de un trade ordenadas por 'orden'."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM trade_imagenes WHERE trade_id = ? ORDER BY orden ASC",
+            (trade_id,),
+        )
+        filas = [dict(f) for f in cursor.fetchall()]
+        conn.close()
+        return filas
+    except Exception as e:
+        print(f"Error obteniendo imágenes del trade {trade_id}: {e}")
+        return []
+
+
+def eliminar_imagen_trade(imagen_id: int) -> bool:
+    """Elimina una imagen por su ID de fila. Devuelve True si tuvo éxito."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        # Recuperar ruta para borrar el archivo físico opcionalmente
+        cursor.execute("SELECT imagen_path FROM trade_imagenes WHERE id = ?", (imagen_id,))
+        fila = cursor.fetchone()
+        if fila:
+            path = fila["imagen_path"]
+            if os.path.isfile(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+        cursor.execute("DELETE FROM trade_imagenes WHERE id = ?", (imagen_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error eliminando imagen {imagen_id}: {e}")
+        return False
+
+
+def eliminar_todas_imagenes_trade(trade_id: int) -> bool:
+    """Elimina todas las imágenes asociadas a un trade (archivos + registros)."""
+    try:
+        imagenes = obtener_imagenes_trade(trade_id)
+        for img in imagenes:
+            path = img.get("imagen_path", "")
+            if path and os.path.isfile(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM trade_imagenes WHERE trade_id = ?", (trade_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error eliminando imágenes del trade {trade_id}: {e}")
+        return False
 
 
 # ─── BACKUP / RESTORE ─────────────────────────────────────────────────────────
