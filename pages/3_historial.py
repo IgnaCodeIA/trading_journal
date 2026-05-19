@@ -19,7 +19,9 @@ from core.database import (
     obtener_imagenes_trade,
     insertar_imagen_trade,
     eliminar_imagen_trade,
+    obtener_configuracion,
 )
+from core.cuenta_selector import render_cuenta_selector
 
 st.set_page_config(page_title="Historial — Trading Journal Pro", layout="wide")
 
@@ -32,8 +34,13 @@ if os.path.exists(css_path):
 st.title("📋 Historial de Trades")
 st.markdown("---")
 
+# ─── Cuenta activa ───────────────────────────────────────────────────────────
+cuenta_id, cuenta = render_cuenta_selector()
+capital  = cuenta.get("capital", 10000.0)
+divisa   = cuenta.get("divisa", "USD")
+
 # ─── Carga de datos ─────────────────────────────────────────────────────────
-trades = obtener_todos_los_trades()
+trades = obtener_todos_los_trades(cuenta_id=cuenta_id)
 
 if not trades:
     st.info("No hay trades registrados todavía. Ve a **Nuevo Trade** para registrar tu primera operación.")
@@ -119,10 +126,18 @@ with col_res2:
     st.metric("Winrate", f"{wr:.1f}%")
 with col_res3:
     pnl_total = df_filtrado["porcentaje_cuenta"].fillna(0).sum()
-    st.metric("P&L Total", f"{pnl_total:+.2f}%")
+    st.metric("P&L Total %", f"{pnl_total:+.2f}%")
 with col_res4:
-    pips_total = df_filtrado["pips_resultado"].fillna(0).sum()
-    st.metric("Pips Totales", f"{pips_total:+.1f}")
+    # USD: usar importe_dinero si existe, si no calcular desde % cuenta × capital
+    if "importe_dinero" in df_filtrado.columns:
+        usd_total = df_filtrado.apply(
+            lambda r: r["importe_dinero"] if (r.get("importe_dinero") not in (None, 0, float("nan")))
+                      else capital * (r.get("porcentaje_cuenta") or 0) / 100,
+            axis=1
+        ).sum()
+    else:
+        usd_total = capital * pnl_total / 100
+    st.metric(f"P&L Total {divisa}", f"{usd_total:+,.0f}")
 
 st.markdown("---")
 
@@ -135,11 +150,21 @@ COLOR_MAP = {
 }
 
 columnas_tabla = [
-    "id", "fecha_entrada", "par", "direccion", "estrategia", "tipo_operacion",
-    "resultado", "pips_resultado", "porcentaje_cuenta", "rr_planificado", "rr_conseguido",
+    "id", "fecha_entrada", "par", "direccion", "estrategia",
+    "resultado", "porcentaje_cuenta", "rr_conseguido",
 ]
 columnas_presentes = [c for c in columnas_tabla if c in df_filtrado.columns]
 df_tabla = df_filtrado[columnas_presentes].copy()
+
+# Columna USD calculada
+if "importe_dinero" in df_filtrado.columns:
+    df_tabla[divisa] = df_filtrado.apply(
+        lambda r: r["importe_dinero"] if (r.get("importe_dinero") not in (None, 0, float("nan")))
+                  else round(capital * (r.get("porcentaje_cuenta") or 0) / 100, 2),
+        axis=1
+    ).values
+else:
+    df_tabla[divisa] = (df_filtrado["porcentaje_cuenta"].fillna(0) * capital / 100).round(2).values
 
 def colorear_resultado(val):
     color = COLOR_MAP.get(str(val), "#e6edf3")
@@ -161,8 +186,8 @@ if "resultado" in df_tabla.columns:
     df_styled = df_styled.applymap(colorear_resultado, subset=["resultado"])
 if "porcentaje_cuenta" in df_tabla.columns:
     df_styled = df_styled.applymap(colorear_pnl, subset=["porcentaje_cuenta"])
-if "pips_resultado" in df_tabla.columns:
-    df_styled = df_styled.applymap(colorear_pnl, subset=["pips_resultado"])
+if divisa in df_tabla.columns:
+    df_styled = df_styled.applymap(colorear_pnl, subset=[divisa])
 
 st.dataframe(df_styled, use_container_width=True, hide_index=True, height=400)
 

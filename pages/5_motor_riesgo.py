@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.database import obtener_todos_los_trades, obtener_configuracion, load_pares, get_lista_pares_plana
+from core.cuenta_selector import render_cuenta_selector
 from core.risk_engine import (
     calcular_metricas_riesgo,
     calcular_riesgo_recomendado,
@@ -27,8 +28,11 @@ if os.path.exists(css_path):
 st.title("⚡ Motor de Riesgo")
 st.markdown("---")
 
+# ─── Cuenta activa ───────────────────────────────────────────────────────────
+cuenta_id, cuenta = render_cuenta_selector()
+
 # ─── Carga de datos ─────────────────────────────────────────────────────────
-trades = obtener_todos_los_trades()
+trades = obtener_todos_los_trades(cuenta_id=cuenta_id)
 config = obtener_configuracion()
 pares_lista = get_lista_pares_plana()
 

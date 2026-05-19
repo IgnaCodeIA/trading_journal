@@ -1,0 +1,6 @@
+#!/bin/bash
+# Launcher generado por build_macos.py
+export PYTHONPATH="/Users/ignaciocarrenoromero/ProyectosPersonales/Trading_journal"
+export PYTHONDONTWRITEBYTECODE=1
+
+exec "/Users/ignaciocarrenoromero/ProyectosPersonales/Trading_journal/.venv/bin/python" "/Users/ignaciocarrenoromero/ProyectosPersonales/Trading_journal/launcher.py" "$@"
