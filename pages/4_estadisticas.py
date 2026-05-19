@@ -12,6 +12,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.database import obtener_todos_los_trades, obtener_configuracion
+from core.cuenta_selector import render_cuenta_selector
 from core.stats import (
     calcular_winrate,
     calcular_profit_factor,
@@ -45,8 +46,11 @@ if os.path.exists(css_path):
 st.title("📈 Estadísticas")
 st.markdown("---")
 
+# ─── Cuenta activa ───────────────────────────────────────────────────────────
+cuenta_id, cuenta = render_cuenta_selector()
+
 # ─── Carga de datos ─────────────────────────────────────────────────────────
-trades = obtener_todos_los_trades()
+trades = obtener_todos_los_trades(cuenta_id=cuenta_id)
 config = obtener_configuracion()
 trades_validos = [t for t in trades if t.get("resultado") in ("Win", "Loss", "Breakeven", "Parcial")]
 

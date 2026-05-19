@@ -102,6 +102,8 @@ PAGES = [
     ("📈","Estadísticas","Análisis avanzado de rendimiento y métricas","4_estadisticas"),
     ("⚡","Motor de Riesgo","Calculadora de posición y gestión dinámica de riesgo","5_motor_riesgo"),
     ("⚙️","Configuración","Parámetros del sistema, pares y backup de datos","6_configuracion"),
+    ("🔬","Backtester","Backtest por estrategia: condiciones, R y análisis de impacto","7_backtester"),
+    ("🎯","Estrategias","Strategy Intelligence: deep dive y comparativa cross-estrategia","8_estrategias"),
 ]
 
 cols = st.columns(3)

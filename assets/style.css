@@ -731,3 +731,49 @@ label[data-testid="stWidgetLabel"] p {
 .semaforo-rojo  { animation: pulse-red  3s infinite; }
 
 .main .block-container > div { animation: fade-in 0.25s ease; }
+
+/* ─── Backtester / Resultado tipos ─────────────────────────────────────────── */
+:root {
+  --res-win:        #00e676;
+  --res-loss:       #ff3c00;
+  --res-be:         #ffc107;
+  --res-partial-tp: #00bcd4;
+  --res-partial-sl: #ff9800;
+}
+
+.res-win        { color: var(--res-win);        font-weight: 700; }
+.res-loss       { color: var(--res-loss);       font-weight: 700; }
+.res-be         { color: var(--res-be);         font-weight: 700; }
+.res-partial-tp { color: var(--res-partial-tp); font-weight: 700; }
+.res-partial-sl { color: var(--res-partial-sl); font-weight: 700; }
+
+.strat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--white);
+}
+.strat-chip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.impact-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.impact-badge.positiva-alta   { background: rgba(63,185,80,0.18);  color: #3fb950; }
+.impact-badge.positiva-media  { background: rgba(227,169,73,0.18); color: #e3a949; }
+.impact-badge.neutral         { background: rgba(139,148,158,0.18); color: #8b949e; }
+.impact-badge.negativa        { background: rgba(248,81,73,0.18);  color: #f85149; }
