@@ -193,6 +193,29 @@ def inicializar_db():
             )
         """)
 
+        # Migración: añadir analisis_asr a backtest_trades si no existe
+        try:
+            cursor.execute("ALTER TABLE backtest_trades ADD COLUMN analisis_asr TEXT")
+        except Exception:
+            pass
+        # Migración: añadir operativa_tipo a backtest_trades si no existe
+        try:
+            cursor.execute("ALTER TABLE backtest_trades ADD COLUMN operativa_tipo TEXT")
+        except Exception:
+            pass
+
+        # ─── Tabla: backtest_imagenes (múltiples capturas por trade backtest) ─
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS backtest_imagenes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                backtest_trade_id INTEGER NOT NULL,
+                imagen_path TEXT NOT NULL,
+                orden INTEGER DEFAULT 0,
+                FOREIGN KEY (backtest_trade_id) REFERENCES backtest_trades(id)
+                    ON DELETE CASCADE
+            )
+        """)
+
         # ─── Seed inicial de estrategias si la tabla está vacía ───────────
         cursor.execute("SELECT COUNT(*) FROM strategies")
         if cursor.fetchone()[0] == 0:
@@ -1061,19 +1084,33 @@ def reordenar_condiciones(strategy_id: int, condicion_id: int, direccion: int) -
 
 def insertar_backtest_trade(datos: dict) -> int:
     """Inserta un trade de backtest. Espera dict con strategy_id, fecha, instrumento,
-    direccion, resultado, rr, condiciones (JSON), notas, screenshot_path."""
+    direccion, resultado, rr, condiciones (JSON), notas, screenshot_path,
+    y opcionalmente analisis_asr, operativa_tipo."""
     try:
+        params = {
+            "strategy_id":     datos.get("strategy_id"),
+            "fecha":           datos.get("fecha"),
+            "instrumento":     datos.get("instrumento"),
+            "direccion":       datos.get("direccion"),
+            "resultado":       datos.get("resultado"),
+            "rr":              datos.get("rr"),
+            "condiciones":     datos.get("condiciones"),
+            "notas":           datos.get("notas"),
+            "screenshot_path": datos.get("screenshot_path"),
+            "analisis_asr":    datos.get("analisis_asr"),
+            "operativa_tipo":  datos.get("operativa_tipo"),
+        }
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO backtest_trades (
                 strategy_id, fecha, instrumento, direccion, resultado, rr,
-                condiciones, notas, screenshot_path
+                condiciones, notas, screenshot_path, analisis_asr, operativa_tipo
             ) VALUES (
                 :strategy_id, :fecha, :instrumento, :direccion, :resultado, :rr,
-                :condiciones, :notas, :screenshot_path
+                :condiciones, :notas, :screenshot_path, :analisis_asr, :operativa_tipo
             )
-        """, datos)
+        """, params)
         nuevo_id = cursor.lastrowid
         conn.commit()
         conn.close()
@@ -1121,4 +1158,145 @@ def eliminar_backtest_trade(bt_id: int) -> bool:
         return True
     except Exception as e:
         print(f"Error eliminando backtest trade {bt_id}: {e}")
+        return False
+
+
+def obtener_backtest_trade_por_id(trade_id: int) -> Optional[dict]:
+    """Devuelve un trade de backtest por su ID."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM backtest_trades WHERE id = ?", (trade_id,))
+        fila = cursor.fetchone()
+        conn.close()
+        return dict(fila) if fila else None
+    except Exception as e:
+        print(f"Error obteniendo backtest trade {trade_id}: {e}")
+        return None
+
+
+def actualizar_backtest_trade(trade_id: int, datos: dict) -> bool:
+    """Actualiza un trade de backtest existente. Devuelve True si tuvo éxito."""
+    try:
+        params = {
+            "id": trade_id,
+            "strategy_id": datos.get("strategy_id"),
+            "fecha": datos.get("fecha"),
+            "instrumento": datos.get("instrumento"),
+            "direccion": datos.get("direccion"),
+            "resultado": datos.get("resultado"),
+            "rr": datos.get("rr"),
+            "condiciones": datos.get("condiciones"),
+            "notas": datos.get("notas"),
+            "screenshot_path": datos.get("screenshot_path"),
+            "analisis_asr": datos.get("analisis_asr"),
+            "operativa_tipo": datos.get("operativa_tipo"),
+        }
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE backtest_trades SET
+                strategy_id = :strategy_id,
+                fecha = :fecha,
+                instrumento = :instrumento,
+                direccion = :direccion,
+                resultado = :resultado,
+                rr = :rr,
+                condiciones = :condiciones,
+                notas = :notas,
+                screenshot_path = :screenshot_path,
+                analisis_asr = :analisis_asr,
+                operativa_tipo = :operativa_tipo
+            WHERE id = :id
+        """, params)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error actualizando backtest trade {trade_id}: {e}")
+        return False
+
+
+# ─── IMÁGENES POR TRADE BACKTEST ─────────────────────────────────────────────
+
+def insertar_imagen_backtest(backtest_trade_id: int, imagen_path: str, orden: int = 0) -> int:
+    """Asocia una imagen a un trade de backtest. Devuelve el ID de la fila creada."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO backtest_imagenes (backtest_trade_id, imagen_path, orden) VALUES (?, ?, ?)",
+            (backtest_trade_id, imagen_path, orden),
+        )
+        nuevo_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return nuevo_id
+    except Exception as e:
+        print(f"Error insertando imagen para backtest trade {backtest_trade_id}: {e}")
+        raise
+
+
+def obtener_imagenes_backtest(backtest_trade_id: int) -> list:
+    """Devuelve la lista de imágenes de un trade de backtest, ordenadas por 'orden'."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM backtest_imagenes WHERE backtest_trade_id = ? ORDER BY orden ASC",
+            (backtest_trade_id,),
+        )
+        filas = [dict(f) for f in cursor.fetchall()]
+        conn.close()
+        return filas
+    except Exception as e:
+        print(f"Error obteniendo imágenes del backtest trade {backtest_trade_id}: {e}")
+        return []
+
+
+def eliminar_imagen_backtest(imagen_id: int) -> bool:
+    """Elimina una imagen de backtest por su ID. Devuelve True si tuvo éxito."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT imagen_path FROM backtest_imagenes WHERE id = ?", (imagen_id,))
+        fila = cursor.fetchone()
+        if fila:
+            path = fila["imagen_path"]
+            if os.path.isfile(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+        cursor.execute("DELETE FROM backtest_imagenes WHERE id = ?", (imagen_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error eliminando imagen backtest {imagen_id}: {e}")
+        return False
+
+
+def eliminar_todas_imagenes_backtest(backtest_trade_id: int) -> bool:
+    """Elimina todas las imágenes asociadas a un trade de backtest (archivos + registros)."""
+    try:
+        imagenes = obtener_imagenes_backtest(backtest_trade_id)
+        for img in imagenes:
+            path = img.get("imagen_path", "")
+            if path and os.path.isfile(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM backtest_imagenes WHERE backtest_trade_id = ?",
+            (backtest_trade_id,),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error eliminando imágenes del backtest trade {backtest_trade_id}: {e}")
         return False

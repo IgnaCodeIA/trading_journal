@@ -35,7 +35,7 @@ from core.database import (
     BASE_DIR,
 )
 
-st.set_page_config(page_title="Configuración — Trading Journal Pro", layout="wide")
+st.set_page_config(page_title="Configuración — Trading Journal Pro", layout="wide", initial_sidebar_state="expanded")
 
 # CSS
 css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "style.css")
@@ -85,14 +85,16 @@ with tab1:
                 with col_g:
                     if st.form_submit_button("💾 Guardar", use_container_width=True, type="primary"):
                         if actualizar_cuenta(c["id"], {"nombre": nombre_c, "broker": broker_c, "capital": capital_c, "divisa": divisa_c, "riesgo_base": riesgo_c}):
-                            st.success("Cuenta actualizada.")
+                            st.success("✅ Cuenta actualizada.")
+                            st.toast("✅ Cuenta actualizada", icon="✅")
                             st.rerun()
                         else:
-                            st.error("Error guardando.")
+                            st.error("❌ Error guardando.")
                 with col_e:
                     if st.form_submit_button("🗑️ Eliminar", use_container_width=True):
                         if eliminar_cuenta(c["id"]):
-                            st.success("Cuenta eliminada.")
+                            st.warning("🗑️ Cuenta eliminada.")
+                            st.toast("🗑️ Cuenta eliminada", icon="🗑️")
                             st.rerun()
                         else:
                             st.warning("No puedes eliminar la única cuenta.")
@@ -113,10 +115,11 @@ with tab1:
         if st.form_submit_button("➕ Crear cuenta", use_container_width=True, type="primary"):
             if new_nombre.strip():
                 crear_cuenta({"nombre": new_nombre.strip(), "broker": new_broker.strip(), "capital": new_capital, "divisa": new_divisa, "riesgo_base": new_riesgo})
-                st.success(f"Cuenta «{new_nombre}» creada correctamente.")
+                st.success(f"✅ Cuenta «{new_nombre}» creada correctamente.")
+                st.toast(f"✅ Cuenta «{new_nombre}» creada", icon="✅")
                 st.rerun()
             else:
-                st.error("El nombre es obligatorio.")
+                st.error("❌ El nombre es obligatorio.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2: Perfil y cuenta
@@ -143,6 +146,7 @@ with tab2:
         }
         if actualizar_configuracion(nuevos_datos):
             st.success("✅ Nombre guardado correctamente.")
+            st.toast("✅ Perfil guardado", icon="✅")
             st.rerun()
         else:
             st.error("❌ Error guardando.")
@@ -235,6 +239,7 @@ with tab3:
         }
         if actualizar_configuracion(nuevos_datos):
             st.success("✅ Parámetros del motor de riesgo guardados.")
+            st.toast("✅ Parámetros guardados", icon="✅")
             st.rerun()
         else:
             st.error("❌ Error guardando los parámetros.")
@@ -299,6 +304,7 @@ GBPUSD""", language="text")
                             # La categoría existe, añadir el par después de la última línea de esa categoría
                             f.write(f"{nuevo_par.upper()}\n")
                     st.success(f"✅ Par `{nuevo_par.upper()}` añadido a la categoría `{nueva_categoria.upper()}`.")
+                    st.toast(f"✅ Par {nuevo_par.upper()} añadido", icon="✅")
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error añadiendo el par: {e}")
@@ -351,7 +357,7 @@ with tab5:
                 with cb1:
                     if st.form_submit_button("💾 Guardar cambios", type="primary"):
                         if not e_nombre.strip():
-                            st.error("El nombre es obligatorio.")
+                            st.error("❌ El nombre es obligatorio.")
                         else:
                             actualizar_estrategia(est["id"], {
                                 "nombre": e_nombre.strip(),
@@ -360,16 +366,18 @@ with tab5:
                                 "color": e_color,
                                 "activa": int(e_activa),
                             })
-                            st.success("Estrategia actualizada.")
+                            st.success("✅ Estrategia actualizada.")
+                            st.toast("✅ Estrategia actualizada", icon="✅")
                             st.rerun()
                 with cb2:
                     if st.form_submit_button("🗑️ Eliminar"):
                         if eliminar_estrategia(est["id"]):
-                            st.success("Estrategia eliminada.")
+                            st.warning("🗑️ Estrategia eliminada.")
+                            st.toast("🗑️ Estrategia eliminada", icon="🗑️")
                             st.rerun()
                         else:
                             st.error(
-                                f"No se puede eliminar: tiene {conteo['total']} trades asociados. "
+                                f"❌ No se puede eliminar: tiene {conteo['total']} trades asociados. "
                                 "Desactívala en su lugar."
                             )
 
@@ -393,19 +401,23 @@ with tab5:
                     with cc2:
                         if st.button("⬆️", key=f"up_{cond['id']}", help="Subir"):
                             reordenar_condiciones(est["id"], cond["id"], -1)
+                            st.toast("✅ Orden actualizado", icon="✅")
                             st.rerun()
                     with cc3:
                         if st.button("⬇️", key=f"dn_{cond['id']}", help="Bajar"):
                             reordenar_condiciones(est["id"], cond["id"], +1)
+                            st.toast("✅ Orden actualizado", icon="✅")
                             st.rerun()
                     with cc4:
                         act = st.checkbox("Activa", value=bool(cond["activa"]), key=f"ac_{cond['id']}")
                         if int(act) != int(cond["activa"]):
                             actualizar_condicion(cond["id"], activa=int(act))
+                            st.toast("✅ Condición actualizada", icon="✅")
                             st.rerun()
                     with cc5:
                         if st.button("🗑️", key=f"del_{cond['id']}", help="Eliminar"):
                             eliminar_condicion(cond["id"])
+                            st.toast("🗑️ Condición eliminada", icon="🗑️")
                             st.rerun()
 
             # Añadir nueva condición
@@ -422,6 +434,7 @@ with tab5:
                     if st.form_submit_button("➕ Añadir"):
                         if nueva_cond.strip():
                             crear_condicion(est["id"], nueva_cond.strip())
+                            st.toast("✅ Condición añadida", icon="✅")
                             st.rerun()
 
     # ─── Crear nueva estrategia ────────────────────────────────────────────
@@ -439,14 +452,15 @@ with tab5:
             ns_desc = st.text_input("Descripción", placeholder="Resumen breve")
         if st.form_submit_button("➕ Crear estrategia", type="primary"):
             if not ns_nombre.strip():
-                st.error("El nombre es obligatorio.")
+                st.error("❌ El nombre es obligatorio.")
             else:
                 try:
                     crear_estrategia(ns_nombre.strip(), ns_tipo, ns_desc, ns_color)
-                    st.success(f"Estrategia «{ns_nombre}» creada.")
+                    st.success(f"✅ Estrategia «{ns_nombre}» creada.")
+                    st.toast(f"✅ Estrategia «{ns_nombre}» creada", icon="✅")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error: {e}. ¿Quizás el nombre ya existe?")
+                    st.error(f"❌ Error: {e}. ¿Quizás el nombre ya existe?")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -472,6 +486,7 @@ with tab6:
                     use_container_width=True,
                 )
                 st.success("✅ Exportación lista para descargar.")
+                st.toast("✅ Exportación generada", icon="✅")
             except Exception as e:
                 st.error(f"❌ Error generando la exportación: {e}")
 
@@ -490,6 +505,7 @@ with tab6:
                     json_str = archivo_importar.read().decode("utf-8")
                     if importar_desde_json(json_str):
                         st.success("✅ Datos importados correctamente.")
+                        st.toast("✅ Datos importados", icon="✅")
                         st.rerun()
                     else:
                         st.error("❌ Error importando los datos.")
@@ -515,7 +531,8 @@ with tab6:
         ):
             if confirm1 and confirm2 == "CONFIRMAR RESET":
                 if resetear_base_datos():
-                    st.success("✅ Base de datos reseteada. Todos los trades han sido eliminados.")
+                    st.warning("🗑️ Base de datos reseteada. Todos los trades han sido eliminados.")
+                    st.toast("🗑️ Base de datos reseteada", icon="🗑️")
                     st.rerun()
                 else:
                     st.error("❌ Error reseteando la base de datos.")

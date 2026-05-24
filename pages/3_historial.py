@@ -7,6 +7,40 @@ import pandas as pd
 import os
 import sys
 from datetime import date, timedelta, time, datetime
+from PIL import Image as PILImage
+
+
+def mostrar_imagen(path: str, caption: str = "", width: int = None):
+    """Muestra una imagen desde ruta absoluta de forma segura."""
+    if path and os.path.isfile(path):
+        try:
+            img = PILImage.open(path)
+            st.image(img, caption=caption, use_container_width=True)
+        except Exception:
+            st.caption(f"⚠️ No se pudo cargar la imagen: {os.path.basename(path)}")
+    else:
+        st.caption("📷 Sin imagen")
+
+
+def _mostrar_imagenes(paths: list, cols: int = 3):
+    """Muestra una lista de rutas de imagen en columnas usando st.image."""
+    paths_validos = [p for p in paths if p and os.path.isfile(p)]
+    paths_invalidos = [p for p in paths if p and not os.path.isfile(p)]
+    if not paths_validos:
+        if paths_invalidos:
+            st.caption("⚠️ Archivo no encontrado")
+        else:
+            st.caption("📷 Sin capturas adjuntas")
+        return
+    columnas = st.columns(min(len(paths_validos), cols))
+    for i, path in enumerate(paths_validos):
+        with columnas[i % cols]:
+            try:
+                img = PILImage.open(path)
+                st.image(img, use_container_width=True,
+                         caption=os.path.basename(path))
+            except Exception:
+                st.caption(f"⚠️ No se pudo cargar: {os.path.basename(path)}")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,7 +57,7 @@ from core.database import (
 )
 from core.cuenta_selector import render_cuenta_selector
 
-st.set_page_config(page_title="Historial — Trading Journal Pro", layout="wide")
+st.set_page_config(page_title="Historial — Trading Journal Pro", layout="wide", initial_sidebar_state="expanded")
 
 # CSS
 css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "style.css")
@@ -191,6 +225,29 @@ if divisa in df_tabla.columns:
 
 st.dataframe(df_styled, use_container_width=True, hide_index=True, height=400)
 
+# ─── Listado inline con capturas por trade ────────────────────────────────────
+st.markdown("##### 📷 Capturas por trade")
+for _, fila in df_filtrado.iterrows():
+    t_id = fila["id"]
+    fecha_t = fila.get("fecha_entrada", "") or ""
+    par_t = fila.get("par", "—")
+    dir_t = fila.get("direccion", "")
+    res_t = fila.get("resultado", "—")
+    rr_t = fila.get("rr_conseguido", 0) or 0
+    pct_t = fila.get("porcentaje_cuenta", 0) or 0
+
+    imagenes = obtener_imagenes_trade(int(t_id))
+    paths = [img["imagen_path"] for img in imagenes]
+    legacy = fila.get("screenshot_path")
+    if legacy:
+        paths.append(legacy)
+    n_paths = sum(1 for p in paths if p and os.path.isfile(p))
+    label_n = f" ({n_paths})" if n_paths > 0 else ""
+    summary = f"#{t_id} · {fecha_t} · {par_t} {dir_t} · {res_t} · R {rr_t:+.2f} · {pct_t:+.2f}%"
+
+    with st.expander(f"📷 Capturas{label_n} — {summary}"):
+        _mostrar_imagenes(paths)
+
 # ─── Exportar CSV ─────────────────────────────────────────────────────────────
 st.markdown("---")
 col_exp1, col_exp2, col_exp3 = st.columns([1, 1, 3])
@@ -230,10 +287,11 @@ else:
         if st.button("🗑️ Eliminar", type="primary", use_container_width=True):
             if confirmar_eliminacion:
                 if eliminar_trade(trade_id_seleccionado):
-                    st.success(f"Trade #{trade_id_seleccionado} eliminado correctamente.")
+                    st.warning(f"🗑️ Trade #{trade_id_seleccionado} eliminado.")
+                    st.toast(f"🗑️ Trade #{trade_id_seleccionado} eliminado", icon="🗑️")
                     st.rerun()
                 else:
-                    st.error("Error al eliminar el trade.")
+                    st.error("❌ Error al eliminar el trade.")
             else:
                 st.warning("Marca la casilla de confirmación para eliminar.")
 
@@ -293,35 +351,37 @@ else:
                 datos_actualizados["analisis_asr"] = None
 
             if actualizar_trade(trade_id_seleccionado, datos_actualizados):
-                st.success(f"Trade #{trade_id_seleccionado} actualizado correctamente.")
+                st.success(f"✅ Trade #{trade_id_seleccionado} actualizado correctamente.")
+                st.toast(f"✅ Trade #{trade_id_seleccionado} actualizado", icon="✅")
                 st.rerun()
             else:
-                st.error("Error actualizando el trade.")
+                st.error("❌ Error actualizando el trade.")
 
     # ─── Imágenes del trade seleccionado ──────────────────────────────────────
     st.markdown("---")
-    st.markdown(f"#### 🖼️ Imágenes del Trade #{trade_id_seleccionado}")
 
     imagenes = obtener_imagenes_trade(trade_id_seleccionado)
-
-    # Mostrar imagen legada (screenshot_path antiguo) si existe
     legacy_path = trade_sel.get("screenshot_path")
-    if legacy_path and os.path.isfile(legacy_path):
-        st.caption("Screenshot original")
-        st.image(legacy_path, use_container_width=True)
+    tiene_imagenes = bool(imagenes) or bool(legacy_path and os.path.isfile(legacy_path))
 
-    if imagenes:
-        cols_img = st.columns(min(len(imagenes), 3))
-        for i, img in enumerate(imagenes):
-            path = img.get("imagen_path", "")
-            if os.path.isfile(path):
+    with st.expander(f"📷 Ver imágenes del trade #{trade_id_seleccionado}", expanded=tiene_imagenes):
+        # Imagen legada (screenshot_path antiguo) si existe
+        if legacy_path and os.path.isfile(legacy_path):
+            mostrar_imagen(legacy_path, caption="Screenshot original")
+
+        if imagenes:
+            cols_img = st.columns(min(len(imagenes), 3))
+            for i, img in enumerate(imagenes):
+                path = img.get("imagen_path", "")
                 with cols_img[i % 3]:
-                    st.image(path, use_container_width=True)
+                    mostrar_imagen(path)
                     if st.button(f"🗑️ Eliminar imagen #{img['id']}", key=f"del_img_{img['id']}"):
                         eliminar_imagen_trade(img["id"])
+                        st.warning(f"🗑️ Imagen #{img['id']} eliminada.")
+                        st.toast("🗑️ Imagen eliminada", icon="🗑️")
                         st.rerun()
-    elif not legacy_path:
-        st.caption("No hay imágenes adjuntas para este trade.")
+        elif not legacy_path:
+            st.caption("Sin imágenes adjuntas")
 
     # Subir nuevas imágenes
     with st.expander("➕ Añadir imágenes al trade"):
@@ -347,7 +407,8 @@ else:
                     with open(ruta, "wb") as f:
                         f.write(img_file.getbuffer())
                     insertar_imagen_trade(trade_id_seleccionado, ruta, orden_base + i)
-                st.success(f"{len(nuevas_imgs)} imagen(es) añadida(s).")
+                st.success(f"✅ {len(nuevas_imgs)} imagen(es) añadida(s).")
+                st.toast(f"✅ {len(nuevas_imgs)} imagen(es) añadida(s)", icon="✅")
                 st.rerun()
             else:
                 st.warning("Selecciona al menos una imagen primero.")

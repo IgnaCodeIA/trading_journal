@@ -17,7 +17,7 @@ from core.risk_engine import (
     calcular_semaforo,
 )
 
-st.set_page_config(page_title="Motor de Riesgo — Trading Journal Pro", layout="wide")
+st.set_page_config(page_title="Motor de Riesgo — Trading Journal Pro", layout="wide", initial_sidebar_state="expanded")
 
 # CSS
 css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "style.css")
@@ -51,9 +51,13 @@ with col_izq:
 
     # Semáforo
     color_sem = semaforo["color"]
-    css_sem = {"green": "semaforo-verde", "orange": "semaforo-amarillo", "red": "semaforo-rojo"}.get(color_sem, "semaforo-verde")
-    st.markdown(f'<div class="{css_sem}">{semaforo["texto"]}</div>', unsafe_allow_html=True)
-    st.markdown(f"*{semaforo['descripcion']}*")
+    msg_sem = f"**{semaforo['texto']}**\n\n{semaforo['descripcion']}"
+    if color_sem == "green":
+        st.success(msg_sem)
+    elif color_sem == "orange":
+        st.warning(msg_sem)
+    else:
+        st.error(msg_sem)
     st.markdown("---")
 
     # Métricas detalladas
@@ -73,17 +77,11 @@ with col_izq:
     tipo = metricas["tipo_racha"]
     if racha > 0:
         if tipo == "ganadora":
-            st.markdown(
-                f'<div class="alerta-ok">🏆 Racha ganadora: <strong>{racha} operaciones</strong> consecutivas</div>',
-                unsafe_allow_html=True,
-            )
+            st.success(f"🏆 Racha ganadora: **{racha} operaciones** consecutivas")
         elif tipo == "perdedora":
-            st.markdown(
-                f'<div class="alerta-critica">⚠️ Racha perdedora: <strong>{racha} operaciones</strong> consecutivas</div>',
-                unsafe_allow_html=True,
-            )
+            st.error(f"⚠️ Racha perdedora: **{racha} operaciones** consecutivas")
     else:
-        st.markdown('<div class="card-metrica">Sin racha definida (primer trade)</div>', unsafe_allow_html=True)
+        st.info("Sin racha definida (primer trade)")
 
     st.markdown("---")
 
@@ -92,21 +90,14 @@ with col_izq:
     riesgo = riesgo_info["riesgo"]
     justificacion = riesgo_info["justificacion"]
 
+    st.metric("% Riesgo Recomendado", f"{riesgo:.2f}%")
+
     if nivel in ("CRITICO", "ALTO"):
-        css_alerta = "alerta-critica"
+        st.error(justificacion)
     elif nivel in ("ELEVADO", "PRECAUCION_DIA", "RACHA_NEGATIVA"):
-        css_alerta = "alerta-precaucion"
+        st.warning(justificacion)
     else:
-        css_alerta = "alerta-ok"
-
-    st.markdown(f"""
-    <div class="{css_alerta}">
-        <div style="font-size:0.85rem; margin-bottom:4px;">% Riesgo Recomendado</div>
-        <div style="font-size:2rem; font-weight:900;">{riesgo:.2f}%</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"<br>{justificacion}", unsafe_allow_html=True)
+        st.success(justificacion)
 
     if riesgo_info.get("sugerencia_parar"):
         st.error("⛔ Se recomienda encarecidamente NO operar más hoy.")
@@ -236,20 +227,18 @@ with col_der:
 
                 # Resumen visual
                 distancia = abs(precio_calc - sl_calc)
-                st.markdown(f"""
-                <div style="background:#1c2128; border:1px solid #30363d; border-radius:10px; padding:16px; margin-top:12px;">
-                    <div style="color:#8b949e; font-size:0.8rem; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.05em;">
-                        Resumen de la operación
-                    </div>
-                    <table style="width:100%; color:#e6edf3; font-size:0.95rem;">
-                        <tr><td style="color:#8b949e;">Par:</td><td><strong>{par_calc}</strong></td></tr>
-                        <tr><td style="color:#8b949e;">Entrada:</td><td><strong>{precio_calc:.5f}</strong></td></tr>
-                        <tr><td style="color:#8b949e;">Stop Loss:</td><td><strong>{sl_calc:.5f}</strong></td></tr>
-                        <tr><td style="color:#8b949e;">Distancia SL:</td><td><strong>{distancia:.5f}</strong></td></tr>
-                        <tr><td style="color:#8b949e;">Riesgo aplicado:</td><td><strong>{riesgo_calc:.2f}%</strong></td></tr>
-                    </table>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown("##### Resumen de la operación")
+                st.markdown(
+                    f"""
+| Campo | Valor |
+|---|---|
+| Par | **{par_calc}** |
+| Entrada | **{precio_calc:.5f}** |
+| Stop Loss | **{sl_calc:.5f}** |
+| Distancia SL | **{distancia:.5f}** |
+| Riesgo aplicado | **{riesgo_calc:.2f}%** |
+"""
+                )
 
     # ─── Histórico de riesgos (referencia rápida) ─────────────────────────────
     st.markdown("---")
