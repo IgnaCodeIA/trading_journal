@@ -24,7 +24,7 @@ from core.cuenta_selector import render_cuenta_selector
 from core import backtester_stats as bs
 
 
-st.set_page_config(page_title="Estrategias — Trading Journal Pro", layout="wide")
+st.set_page_config(page_title="Estrategias — Trading Journal Pro", layout="wide", initial_sidebar_state="expanded")
 
 css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "style.css")
 if os.path.exists(css_path):

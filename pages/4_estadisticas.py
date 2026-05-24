@@ -35,7 +35,7 @@ from core.stats import (
     calcular_pnl_mes,
 )
 
-st.set_page_config(page_title="Estadísticas — Trading Journal Pro", layout="wide")
+st.set_page_config(page_title="Estadísticas — Trading Journal Pro", layout="wide", initial_sidebar_state="expanded")
 
 # CSS
 css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "style.css")

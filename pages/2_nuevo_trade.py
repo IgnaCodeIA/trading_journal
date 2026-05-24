@@ -26,7 +26,7 @@ from core.database import (
 from core.cuenta_selector import render_cuenta_selector
 from core.backtester_stats import top_condiciones
 
-st.set_page_config(page_title="Nuevo Trade — Trading Journal Pro", layout="wide")
+st.set_page_config(page_title="Nuevo Trade — Trading Journal Pro", layout="wide", initial_sidebar_state="expanded")
 
 css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "style.css")
 if os.path.exists(css_path):
@@ -278,6 +278,6 @@ if submit:
             st.success(
                 f"✅ {len(ids_creados)} trade(s) guardados — {par} {direccion} {resultado} · R:R {rr_conseguido:+.2f}\n\n{resumen}"
             )
-            st.balloons()
+            st.toast(f"✅ {len(ids_creados)} trade(s) guardados", icon="✅")
         except Exception as e:
-            st.error(f"Error guardando los trades: {e}")
+            st.error(f"❌ Error guardando los trades: {e}")

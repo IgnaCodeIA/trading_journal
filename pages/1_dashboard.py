@@ -46,77 +46,49 @@ divisa       = cuenta.get("divisa", "USD")
 nombre       = config.get("nombre_trader", "Trader")
 
 # ─── Page header ─────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div class="page-header">
-  <span class="page-header-icon">📊</span>
-  <div>
-    <div class="page-header-title">Dashboard</div>
-    <div class="page-header-sub">Bienvenido, {nombre} · {date.today().strftime("%A, %d de %B de %Y")} · Cuenta: {capital:,.0f} {divisa}</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.title("📊 Dashboard")
+st.caption(f"Bienvenido, {nombre} · {date.today().strftime('%A, %d de %B de %Y')} · Cuenta: {capital:,.0f} {divisa}")
 
 # ─── KPI Row ─────────────────────────────────────────────────────────────────
 usd_dia = capital * pnl_dia / 100
 usd_sem = capital * pnl_sem / 100
 usd_mes = capital * pnl_mes / 100
 
-def kpi(label, value, delta=None, accent="#58a6ff", sub=None):
-    delta_html = ""
-    if delta is not None:
-        cls = "pos" if delta >= 0 else "neg"
-        arrow = "▲" if delta >= 0 else "▼"
-        delta_html = f'<div class="kpi-card-delta {cls}">{arrow} {abs(delta):.2f}%</div>'
-    sub_html = f'<div style="font-size:0.75rem;color:#8b949e;margin-top:2px;font-family:\'JetBrains Mono\',monospace">{sub}</div>' if sub else ""
-    return f"""
-    <div class="kpi-card">
-      <div class="kpi-card-accent" style="background:linear-gradient(90deg,{accent},transparent)"></div>
-      <div class="kpi-card-label">{label}</div>
-      <div class="kpi-card-value">{value}</div>
-      {sub_html}
-      {delta_html}
-    </div>"""
+c1, c2, c3, c4, c5, c6 = st.columns(6)
+c1.metric("P&L Hoy",      f"{pnl_dia:+.2f}%", delta=f"{usd_dia:+,.0f} {divisa}")
+c2.metric("P&L Semana",   f"{pnl_sem:+.2f}%", delta=f"{usd_sem:+,.0f} {divisa}")
+c3.metric("P&L Mes",      f"{pnl_mes:+.2f}%", delta=f"{usd_mes:+,.0f} {divisa}")
+c4.metric("Drawdown",     f"{dd:.2f}%",       delta=f"{-capital * dd / 100:,.0f} {divisa}", delta_color="inverse")
+c5.metric("Winrate",      f"{wr_global:.1f}%")
+c6.metric("Riesgo Rec.",  f"{riesgo_info['riesgo']:.2f}%")
 
-c1,c2,c3,c4,c5,c6 = st.columns(6)
-COLS = [c1,c2,c3,c4,c5,c6]
-kpis = [
-    ("P&L Hoy",    f"{pnl_dia:+.2f}%",  pnl_dia,  "#58a6ff",  f"{usd_dia:+,.0f} {divisa}"),
-    ("P&L Semana", f"{pnl_sem:+.2f}%",  pnl_sem,  "#bc8cff",  f"{usd_sem:+,.0f} {divisa}"),
-    ("P&L Mes",    f"{pnl_mes:+.2f}%",  pnl_mes,  "#39d0d8",  f"{usd_mes:+,.0f} {divisa}"),
-    ("Drawdown",   f"{dd:.2f}%",         -dd,      "#f85149",  f"{-capital * dd / 100:,.0f} {divisa}"),
-    ("Winrate",    f"{wr_global:.1f}%",  None,     "#3fb950",  None),
-    ("Riesgo Rec.",f"{riesgo_info['riesgo']:.2f}%",None,"#e3a949", None),
-]
-for col, (label, val, delta, accent, sub) in zip(COLS, kpis):
-    with col:
-        st.markdown(kpi(label, val, delta, accent, sub), unsafe_allow_html=True)
-
-st.markdown("<div style='margin:1.5rem 0 0'></div>", unsafe_allow_html=True)
+st.divider()
 
 # ─── Semáforo + Motor de riesgo ──────────────────────────────────────────────
 col_sem, col_metricas = st.columns([2, 3])
 
 with col_sem:
     color = semaforo["color"]
-    cls = {"green":"semaforo-verde","orange":"semaforo-amarillo","red":"semaforo-rojo"}.get(color,"semaforo-verde")
-    st.markdown(f"""
-    <div class="semaforo {cls}">
-      <span style="font-size:2.5rem;line-height:1">{semaforo['texto'].split()[0]}</span>
-      <div>
-        <div style="font-size:1rem;font-weight:800">{' '.join(semaforo['texto'].split()[1:])}</div>
-        <div style="font-size:0.78rem;font-weight:400;opacity:0.85;margin-top:4px">{semaforo['descripcion']}</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    titulo_sem = semaforo["texto"]
+    descripcion_sem = semaforo["descripcion"]
+    if color == "green":
+        st.success(f"**{titulo_sem}**\n\n{descripcion_sem}")
+    elif color == "orange":
+        st.warning(f"**{titulo_sem}**\n\n{descripcion_sem}")
+    else:
+        st.error(f"**{titulo_sem}**\n\n{descripcion_sem}")
 
-    st.markdown(f"""
-    <div style="margin-top:12px" class="alert-{'critica' if riesgo_info['nivel'] in ('CRITICO','ALTO') else 'precaucion' if riesgo_info['nivel'] in ('ELEVADO','PRECAUCION_DIA','RACHA_NEGATIVA') else 'ok'}">
-      {riesgo_info['justificacion']}
-    </div>
-    """, unsafe_allow_html=True)
+    nivel = riesgo_info["nivel"]
+    just = riesgo_info["justificacion"]
+    if nivel in ("CRITICO", "ALTO"):
+        st.error(just)
+    elif nivel in ("ELEVADO", "PRECAUCION_DIA", "RACHA_NEGATIVA"):
+        st.warning(just)
+    else:
+        st.success(just)
 
 with col_metricas:
-    m1,m2,m3,m4 = st.columns(4)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("WR-10",   f"{metricas['winrate_10']:.0f}%")
     m2.metric("WR-20",   f"{metricas['winrate_20']:.0f}%")
     racha_txt = f"{metricas['racha_actual']} {'🏆' if metricas['tipo_racha']=='ganadora' else '⚠️'}" if metricas['racha_actual'] else "—"
@@ -127,7 +99,7 @@ with col_metricas:
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
         value=dd,
-        number={"suffix":"%","font":{"size":22,"family":"JetBrains Mono","color":"#e6edf3"}},
+        number={"suffix":"%","font":{"size":22,"family":"IBM Plex Mono","color":"#e6edf3"}},
         gauge={
             "axis":{"range":[0,15],"tickcolor":"#8b949e","tickfont":{"size":9}},
             "bar":{"color":"#f85149" if dd>8 else "#e3a949" if dd>5 else "#3fb950","thickness":0.25},
@@ -150,61 +122,32 @@ with col_metricas:
     )
     st.plotly_chart(fig_gauge, use_container_width=True)
 
-st.markdown("<hr>", unsafe_allow_html=True)
+st.divider()
 
-# ─── Últimos 5 trades ─────────────────────────────────────────────────────────
+# ─── Últimos 5 trades + Equity curve ──────────────────────────────────────────
 col_trades, col_equity = st.columns([1, 2])
-
-STRAT_COLORS = {"Blue":"#58a6ff","Red":"#f85149","Pink":"#ff7eb6","White":"#c9d1d9","Black":"#8b949e","Green":"#3fb950"}
-RES_COLORS   = {"Win":"#3fb950","Loss":"#f85149","Breakeven":"#8b949e","Parcial":"#e3a949"}
 
 with col_trades:
     st.subheader("Últimas Operaciones")
     ultimos = obtener_ultimos_trades(5, cuenta_id=cuenta_id)
     if not ultimos:
-        st.markdown('<div class="alert-info">Sin trades registrados. Ve a <strong>Nuevo Trade</strong> para empezar.</div>', unsafe_allow_html=True)
+        st.info("Sin trades registrados. Ve a **Nuevo Trade** para empezar.")
     else:
-        # Header
-        st.markdown("""
-        <div style="background:var(--bg-4);border-radius:10px 10px 0 0;border:1px solid var(--border);border-bottom:0">
-          <div style="display:grid;grid-template-columns:70px 75px 60px 65px 70px 75px;gap:0;padding:8px 12px">
-            <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-2)">Fecha</span>
-            <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-2)">Par</span>
-            <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-2)">Strat</span>
-            <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-2)">Result.</span>
-            <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-2)">% Cta</span>
-            <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted-2)">{divisa}</span>
-          </div>
-        </div>
-        """.replace("{divisa}", divisa), unsafe_allow_html=True)
+        rows = []
+        for t in ultimos:
+            pct = t.get("porcentaje_cuenta", 0) or 0
+            usd = t.get("importe_dinero") or (capital * pct / 100)
+            rows.append({
+                "Fecha": (t.get("fecha_entrada", "") or "")[-5:],
+                "Par":   t.get("par", "—"),
+                "Strat": t.get("estrategia", "—"),
+                "Resultado": t.get("resultado", "—"),
+                "% Cta": round(pct, 2),
+                divisa:  round(usd, 0),
+            })
+        df_ultimos = pd.DataFrame(rows)
+        st.dataframe(df_ultimos, use_container_width=True, hide_index=True)
 
-        rows_html = '<div style="border:1px solid var(--border);border-radius:0 0 10px 10px;overflow:hidden">'
-        for i, t in enumerate(ultimos):
-            bg = "var(--bg-3)" if i % 2 == 0 else "var(--bg-4)"
-            res  = t.get("resultado","—")
-            stra = t.get("estrategia","—")
-            pct  = t.get("porcentaje_cuenta",0) or 0
-            usd  = t.get("importe_dinero") or (capital * pct / 100)
-            rc   = RES_COLORS.get(res,"#8b949e")
-            sc   = STRAT_COLORS.get(stra,"#8b949e")
-            pct_c = "#3fb950" if pct > 0 else "#f85149" if pct < 0 else "#8b949e"
-            usd_c = "#3fb950" if usd > 0 else "#f85149" if usd < 0 else "#8b949e"
-            fecha  = (t.get("fecha_entrada","") or "")[-5:]
-            rows_html += f"""
-            <div style="display:grid;grid-template-columns:70px 75px 60px 65px 70px 75px;gap:0;
-                        padding:9px 12px;background:{bg};border-bottom:1px solid var(--border);
-                        font-family:'JetBrains Mono',monospace;font-size:0.8rem;transition:background 0.1s">
-              <span style="color:var(--muted)">{fecha}</span>
-              <span style="color:var(--white);font-weight:600">{t.get('par','—')}</span>
-              <span style="color:{sc};font-weight:700">{stra}</span>
-              <span style="color:{rc};font-weight:700">{res}</span>
-              <span style="color:{pct_c};font-weight:600">{pct:+.2f}%</span>
-              <span style="color:{usd_c};font-weight:600">{usd:+,.0f}</span>
-            </div>"""
-        rows_html += "</div>"
-        st.markdown(rows_html, unsafe_allow_html=True)
-
-# ─── Equity curve ────────────────────────────────────────────────────────────
 with col_equity:
     st.subheader("Equity Curve — Últimos 30 días")
     hace_30 = (date.today() - timedelta(days=30)).isoformat()
@@ -212,7 +155,7 @@ with col_equity:
     curva = calcular_equity_curve(tv30, capital)
 
     if len(curva) < 2:
-        st.markdown('<div class="alert-info">Necesitas al menos 2 trades para ver la equity curve.</div>', unsafe_allow_html=True)
+        st.info("Necesitas al menos 2 trades para ver la equity curve.")
     else:
         fechas = [p["fecha"] or "Inicio" for p in curva]
         valores = [p["equity"] for p in curva]
@@ -228,7 +171,7 @@ with col_equity:
         fig.add_trace(go.Scatter(
             x=fechas, y=valores, mode="lines+markers",
             line=dict(color=color_line, width=2.5, shape="spline"),
-            marker=dict(size=6, color=color_line, line=dict(width=2, color=var if (var:="var(--bg-3)") else "")),
+            marker=dict(size=6, color=color_line, line=dict(width=2, color="#1c2128")),
             name="Equity", showlegend=False,
             hovertemplate="<b>%{x}</b><br>Equity: %{y:,.2f} " + divisa + "<extra></extra>",
         ))
@@ -258,22 +201,18 @@ with col_equity:
 
 # ─── Sidebar stats ────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown(f"""
-    <div style="padding:12px 0 8px">
-      <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted-2);margin-bottom:8px">Resumen Global</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.subheader("Resumen Global")
     st.metric("Total trades",  len(tv))
     st.metric("Winrate global", f"{wr_global:.1f}%")
-    wins   = sum(1 for t in tv if t.get("resultado")=="Win")
-    losses = sum(1 for t in tv if t.get("resultado")=="Loss")
+    wins   = sum(1 for t in tv if t.get("resultado") == "Win")
+    losses = sum(1 for t in tv if t.get("resultado") == "Loss")
     st.metric("W / L", f"{wins} / {losses}")
-    st.markdown("---")
+    st.divider()
     pnl_total_pct = sum(t.get("porcentaje_cuenta", 0) or 0 for t in tv)
     pnl_total_usd = capital * pnl_total_pct / 100
     st.metric(f"P&L Total ({divisa})", f"{pnl_total_usd:+,.0f}", delta=f"{pnl_total_pct:+.2f}%")
     st.metric(f"P&L Mes ({divisa})",   f"{usd_mes:+,.0f}",       delta=f"{pnl_mes:+.2f}%")
-    st.metric(f"P&L Semana ({divisa})",f"{usd_sem:+,.0f}",       delta=f"{pnl_sem:+.2f}%")
+    st.metric(f"P&L Semana ({divisa})", f"{usd_sem:+,.0f}",      delta=f"{pnl_sem:+.2f}%")
 
 # ─── Footer ───────────────────────────────────────────────────────────────────
-st.markdown('<div class="app-footer">Trading Journal Pro v2.0 · {}</div>'.format(date.today().year), unsafe_allow_html=True)
+st.markdown(f'<div class="app-footer">Trading Journal Pro v2.0 · {date.today().year}</div>', unsafe_allow_html=True)
