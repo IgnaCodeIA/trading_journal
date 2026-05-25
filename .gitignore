@@ -2,3 +2,7 @@
 data/trades.db
 __pycache__
 *png
+*jpg
+*jpeg
+*webp
+*.pyc
