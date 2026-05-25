@@ -61,9 +61,9 @@ with col_op:
     )
 
 with col_strat:
-    estrategias_disp = obtener_estrategias(solo_activas=True, tipo=operativa_tipo)
+    estrategias_disp = obtener_estrategias(solo_activas=True)
     if not estrategias_disp:
-        st.warning(f"No hay estrategias activas de tipo {operativa_tipo}. Créalas en ⚙️ Configuración → Estrategias.")
+        st.warning("No hay estrategias activas. Créalas en ⚙️ Configuración → Estrategias.")
         st.stop()
     nombres_strat = [e["nombre"] for e in estrategias_disp]
     nombre_sel = st.selectbox("Estrategia *", options=nombres_strat, key="nt_strategy")
